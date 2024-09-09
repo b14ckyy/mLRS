@@ -22,6 +22,7 @@ class tTxDisp
     void Init(void) {}
     void Tick_ms(void) {}
     uint8_t Task(void) { return 0; }
+    void DrawNotify(const char* const s) {}
     void DrawBoot(void) {}
 };
 
@@ -111,7 +112,7 @@ class tTxDisp
     void SetBind(void);
     void Draw(void);
     uint8_t Task(void);
-    void DrawNotify(const char* s);
+    void DrawNotify(const char* const s);
     void DrawBoot(void);
 
     typedef struct {
@@ -125,7 +126,7 @@ class tTxDisp
     bool key_has_been_pressed(uint8_t key_idx);
 
     void draw_page_startup(void);
-    void draw_page_notify(const char* s);
+    void draw_page_notify(const char* const s);
     void draw_page_main(void);
     void draw_page_common(void);
     void draw_page_tx(void);
@@ -137,8 +138,8 @@ class tTxDisp
     void draw_page_main_sub2(void);
     void draw_page_main_sub3(void);
 
-    void draw_header(const char* s);
-    void draw_options(tParamList* list);
+    void draw_header(const char* const s);
+    void draw_options(tParamList* const list);
 
     bool initialized;
     uint8_t task_pending;
@@ -194,7 +195,7 @@ void tTxDisp::Init(void)
 #endif
     }
 
-    task_pending = CLI_TASK_NONE;
+    task_pending = TX_TASK_NONE;
     connected_last = false;
     setupmetadata_rx_available_last = false;
 
@@ -234,14 +235,14 @@ void tTxDisp::Init(void)
     idx_max = 0;
     idx_focused_in_edit = false;
     idx_focused_pos = 0;
-    idx_focused_task_pending = CLI_TASK_NONE;
+    idx_focused_task_pending = TX_TASK_NONE;
 }
 
 
 uint8_t tTxDisp::Task(void)
 {
     uint8_t task = task_pending;
-    task_pending = 0;
+    task_pending = TX_TASK_NONE;
     return task;
 }
 
@@ -421,8 +422,8 @@ if(!idx_focused_in_edit){
     if (edit_setting()) { // edit, and finish if true
         idx_focused_in_edit = false;
         page_modified = true;
-        if (idx_focused_task_pending != CLI_TASK_NONE) task_pending = idx_focused_task_pending;
-        idx_focused_task_pending = CLI_TASK_NONE;
+        if (idx_focused_task_pending != TX_TASK_NONE) task_pending = idx_focused_task_pending;
+        idx_focused_task_pending = TX_TASK_NONE;
     }
 
 }
@@ -459,16 +460,16 @@ void tTxDisp::run_action(void)
     case DISP_ACTION_STORE:
         page = PAGE_NOTIFY_STORE;
         page_modified = true;
-        task_pending = CLI_TASK_PARAM_STORE;
+        task_pending = TX_TASK_PARAM_STORE;
         break;
     case DISP_ACTION_BIND:
-        task_pending = CLI_TASK_BIND;
+        task_pending = TX_TASK_BIND;
         break;
     case DISP_ACTION_BOOT:
-        task_pending = CLI_TASK_BOOT;
+        task_pending = TX_TASK_SYSTEM_BOOT;
         break;
     case DISP_ACTION_FLASH_ESP:
-        task_pending = CLI_TASK_FLASH_ESP;
+        task_pending = TX_TASK_FLASH_ESP;
         break;
     }
 }
@@ -489,7 +490,7 @@ void tTxDisp::SetBind(void)
 }
 
 
-void tTxDisp::DrawNotify(const char* s)
+void tTxDisp::DrawNotify(const char* const s)
 {
     if (!initialized) return;
     page_modified = true;
@@ -577,7 +578,7 @@ void _draw_dot2(uint8_t x, uint8_t y)
 }
 
 
-void tTxDisp::draw_header(const char* s)
+void tTxDisp::draw_header(const char* const s)
 {
     gdisp_clear();
 
@@ -591,7 +592,7 @@ void tTxDisp::draw_header(const char* s)
 }
 
 
-void tTxDisp::draw_options(tParamList* list)
+void tTxDisp::draw_options(tParamList* const list)
 {
 char s[32];
 
@@ -670,7 +671,7 @@ void tTxDisp::draw_page_startup(void)
 }
 
 
-void tTxDisp::draw_page_notify(const char* s)
+void tTxDisp::draw_page_notify(const char* const s)
 {
     if (!page_modified) return;
 
@@ -1129,7 +1130,7 @@ bool tTxDisp::edit_setting(void)
 
     }
 
-    if (rx_param_changed) idx_focused_task_pending = CLI_TASK_RX_PARAM_SET;
+    if (rx_param_changed) idx_focused_task_pending = TX_TASK_RX_PARAM_SET;
     return false; // keep on editing
 }
 

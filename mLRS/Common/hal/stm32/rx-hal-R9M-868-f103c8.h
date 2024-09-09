@@ -12,7 +12,6 @@
 //-------------------------------------------------------
 
 #define DEVICE_HAS_OUT_INVERTED
-#define DEVICE_HAS_BUZZER
 #define DEVICE_HAS_FAN_ONOFF
 
 
@@ -33,7 +32,7 @@
 //-- UARTS
 // UARTB = serial port
 // UART = output port, SBus or whatever
-// UARTC = debug port
+// UARTF = debug port
 
 #define UARTB_USE_UART1_PA9PA10 // serial
 #define UARTB_BAUD                RX_SERIAL_BAUDRATE
@@ -51,13 +50,13 @@
 //#define UART_USE_RX
 //#define UART_RXBUFSIZE            512
 
-#define UARTC_USE_UART2_PA2PA3 // debug // Tx goes via an inverter to JR Pin2, solder to R15 for TTL UART signal, C23 provides GND
-#define UARTC_BAUD                115200
-#define UARTC_USE_TX
-#define UARTC_TXBUFSIZE           512
-#define UARTC_USE_TX_ISR
-//#define UARTC_USE_RX
-//#define UARTC_RXBUFSIZE           512
+#define UARTF_USE_UART2_PA2PA3 // debug // Tx goes via an inverter to JR Pin2, solder to R15 for TTL UART signal, C23 provides GND
+#define UARTF_BAUD                115200
+#define UARTF_USE_TX
+#define UARTF_TXBUFSIZE           512
+#define UARTF_USE_TX_ISR
+//#define UARTF_USE_RX
+//#define UARTF_RXBUFSIZE           512
 
 
 //-- SX1: SX12xx & SPI
@@ -183,17 +182,6 @@ void led_green_toggle(void) { gpio_toggle(LED_GREEN); }
 void led_red_off(void) { gpio_low(LED_RED); }
 void led_red_on(void) { gpio_high(LED_RED); }
 void led_red_toggle(void) { gpio_toggle(LED_RED); }
-
-
-//-- Buzzer
-// Buzzer is active high
-
-#define BUZZER                    IO_PB1
-#define BUZZER_TIMx               TIM1
-#define BUZZER_IRQn               TIM1_UP_IRQn
-#define BUZZER_IRQHandler         TIM1_UP_IRQHandler
-#define BUZZER_TIM_CHANNEL        LL_TIM_CHANNEL_CH3N
-//#define BUZZER_TIM_IRQ_PRIORITY   14
 
 
 //-- Cooling Fan

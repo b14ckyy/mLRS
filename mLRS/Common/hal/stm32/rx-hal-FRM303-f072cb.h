@@ -15,7 +15,6 @@
 // T1, T2 (32b), T3, T14, T15, T16, T17, internal T6, T7
 
 #define DEVICE_HAS_OUT
-#define DEVICE_HAS_BUZZER
 //#define DEVICE_HAS_DEBUG_SWUART
 #define DEVICE_HAS_NO_DEBUG
 #define DEVICE_HAS_SYSTEMBOOT
@@ -33,19 +32,17 @@
 #undef CLOCK_IRQ_PRIORITY
 #undef UARTB_IRQ_PRIORITY
 #undef UART_IRQ_PRIORITY
-#undef UARTC_IRQ_PRIORITY
+#undef UARTF_IRQ_PRIORITY
 #undef SX_DIO_EXTI_IRQ_PRIORITY
 #undef SX2_DIO_EXTI_IRQ_PRIORITY
 #undef SWUART_TIM_IRQ_PRIORITY
-#undef BUZZER_TIM_IRQ_PRIORITY
 #define CLOCK_IRQ_PRIORITY          0 // 10
 #define UARTB_IRQ_PRIORITY          1 // 11 // serial
 #define UART_IRQ_PRIORITY           2 // 12 // out pin
-#define UARTC_IRQ_PRIORITY          1 // 11 // debug
+#define UARTF_IRQ_PRIORITY          1 // 11 // debug
 #define SX_DIO_EXTI_IRQ_PRIORITY    2 // 13
 #define SX2_DIO_EXTI_IRQ_PRIORITY   2 // 13
 #define SWUART_TIM_IRQ_PRIORITY     0 //  9 // debug on swuart
-#define BUZZER_TIM_IRQ_PRIORITY     3 // 14
 
 
 //-- Timers, Timing, EEPROM, and such stuff
@@ -67,7 +64,7 @@ static inline void delay_ns(uint32_t ns) {} // LA log shows, no delay needed
 //-- UARTS
 // UARTB = serial port
 // UART = output port, SBus or whatever
-// UARTC = debug port
+// UARTF = debug port
 
 #define UARTB_USE_UART2_PA2PA3 // serial
 #define UARTB_BAUD                TX_SERIAL_BAUDRATE
@@ -233,18 +230,6 @@ void led_green_toggle(void) { gpio_toggle(LED_GREEN); }
 void led_red_off(void) { gpio_high(LED_RED); }
 void led_red_on(void) { gpio_low(LED_RED); }
 void led_red_toggle(void) { gpio_toggle(LED_RED); }
-
-
-//-- Buzzer
-// Buzzer is active high
-
-#define BUZZER                    IO_PB11
-#define BUZZER_IO_AF              IO_AF_2
-#define BUZZER_TIMx               TIM2
-#define BUZZER_IRQn               TIM2_IRQn
-#define BUZZER_IRQHandler         TIM2_IRQHandler
-#define BUZZER_TIM_CHANNEL        LL_TIM_CHANNEL_CH4
-//#define BUZZER_TIM_IRQ_PRIORITY   14
 
 
 //-- SystemBootLoader

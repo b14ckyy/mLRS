@@ -161,13 +161,6 @@ void setup_configure_metadata(void)
     SetupMetaData.Rx_OutMode_allowed_mask = 0;  // not available, do not display
 #endif
 
-    // Rx Buzzer: ""off,LP"
-#ifdef DEVICE_HAS_BUZZER
-    SetupMetaData.Rx_Buzzer_allowed_mask = UINT16_MAX; // all
-#else
-    SetupMetaData.Rx_Buzzer_allowed_mask = 0; // not available, do not display
-#endif
-
     //-- Tx: Receiver setup meta data
 
     SetupMetaData.rx_available = false;
@@ -201,12 +194,14 @@ void inc_bindphrase_char(char* s, uint8_t pos)
 }
 
 
+// make the default bind phrases all different for all config id's
+// this provides a sort of model match per default
 void setup_default_bindphrase(char* s, uint8_t config_id, const char* bindphrase_default)
 {
     strcpy(s, bindphrase_default);
     if (config_id == 0) return;
 
-#ifdef FREQUENCY_BAND_2P4_GHZ
+#ifdef FREQUENCY_BAND_2P4_GHZ // a bit more to do because of the "except" option
     switch (config_id) {
         case 1: s[5] = '5'; break;
         case 2: s[5] = 'a'; break;
@@ -247,6 +242,7 @@ void setup_default(uint8_t config_id)
     Setup.Tx[config_id].SendRadioStatus = SETUP_TX_SEND_RADIO_STATUS;
     Setup.Tx[config_id].Buzzer = SETUP_TX_BUZZER;
     Setup.Tx[config_id].CliLineEnd = SETUP_TX_CLI_LINE_END;
+    Setup.Tx[config_id].MavlinkComponent = SETUP_TX_MAV_COMPONENT;
 
     Setup.Rx.Power = SETUP_RX_POWER;
     Setup.Rx.Diversity = SETUP_RX_DIVERSITY;
@@ -257,7 +253,6 @@ void setup_default(uint8_t config_id)
     Setup.Rx.SerialBaudrate = SETUP_RX_SERIAL_BAUDRATE;
     Setup.Rx.SerialLinkMode = SETUP_RX_SERIAL_LINK_MODE;
     Setup.Rx.SendRadioStatus = SETUP_RX_SEND_RADIO_STATUS;
-    Setup.Rx.Buzzer = SETUP_RX_BUZZER;
     Setup.Rx.SendRcChannels = SETUP_RX_SEND_RC_CHANNELS;
 
     for (uint8_t ch = 0; ch < 12; ch++) { Setup.Rx.FailsafeOutChannelValues_Ch1_Ch12[ch] = 0; }
@@ -315,8 +310,15 @@ void setup_sanitize_config(uint8_t config_id)
     }
     TST_NOTALLOWED(FrequencyBand_allowed_mask, Common[config_id].FrequencyBand, frequency_band_default);
 
-    SANITIZE(Common[config_id].Mode, MODE_NUM, SETUP_MODE, MODE_19HZ);
-    TST_NOTALLOWED(Mode_allowed_mask, Common[config_id].Mode, MODE_19HZ);
+#ifdef DEVICE_HAS_SX128x
+    constexpr uint8_t fallback_mode = MODE_50HZ;
+#elif defined DEVICE_HAS_DUAL_SX126x_SX128x || defined DEVICE_HAS_DUAL_SX126x_SX126x || defined DEVICE_HAS_SX126x
+    constexpr uint8_t fallback_mode = MODE_31HZ;
+#elif defined DEVICE_HAS_SX127x
+    constexpr uint8_t fallback_mode = MODE_19HZ;
+#endif
+    SANITIZE(Common[config_id].Mode, MODE_NUM, SETUP_MODE, fallback_mode); // MODE_19HZ
+    TST_NOTALLOWED(Mode_allowed_mask, Common[config_id].Mode, fallback_mode); // MODE_19HZ
 
     SANITIZE(Common[config_id].Ortho, ORTHO_NUM, SETUP_RF_ORTHO, ORTHO_NONE);
     TST_NOTALLOWED(Ortho_allowed_mask, Common[config_id].Ortho, ORTHO_NONE);
@@ -350,11 +352,12 @@ void setup_sanitize_config(uint8_t config_id)
     SANITIZE(Tx[config_id].SerialBaudrate, SERIAL_BAUDRATE_NUM, SETUP_TX_SERIAL_BAUDRATE, SERIAL_BAUDRATE_115200);
 
     SANITIZE(Tx[config_id].SendRadioStatus, TX_SEND_RADIO_STATUS_NUM, SETUP_TX_SEND_RADIO_STATUS, TX_SEND_RADIO_STATUS_OFF);
+    SANITIZE(Tx[config_id].MavlinkComponent, TX_MAVLINK_COMPONENT_NUM, SETUP_TX_MAV_COMPONENT, TX_MAVLINK_COMPONENT_OFF);
 
     SANITIZE(Tx[config_id].Buzzer, BUZZER_NUM, SETUP_TX_BUZZER, BUZZER_OFF);
     TST_NOTALLOWED(Tx_Buzzer_allowed_mask, Tx[config_id].Buzzer, BUZZER_OFF);
 
-    SANITIZE(Tx[config_id].CliLineEnd, CLI_LINE_END_NUM, SETUP_TX_CLI_LINE_END, CLI_LINE_END_CR);
+    SANITIZE(Tx[config_id].CliLineEnd, CLI_LINE_END_NUM, SETUP_TX_CLI_LINE_END, CLI_LINE_END_CRLF);
 
     // device cannot use mBridge (pin5) and CRSF (pin5) at the same time !
     // dest\src | NONE    | CRSF    | INPORT  | MBRIDGE
@@ -385,9 +388,6 @@ void setup_sanitize_config(uint8_t config_id)
 
     SANITIZE(Rx.FailsafeMode, FAILSAFE_MODE_NUM, SETUP_RX_FAILSAFE_MODE, FAILSAFE_MODE_NO_SIGNAL);
 
-    SANITIZE(Rx.Buzzer, BUZZER_LOST_PACKETS + 1, SETUP_RX_BUZZER, BUZZER_OFF);
-    TST_NOTALLOWED(Rx_Buzzer_allowed_mask, Rx.Buzzer, BUZZER_OFF);
-
     for (uint8_t ch = 0; ch < 12; ch++) {
         if (Setup.Rx.FailsafeOutChannelValues_Ch1_Ch12[ch] < -120) Setup.Rx.FailsafeOutChannelValues_Ch1_Ch12[ch] = 0;
         if (Setup.Rx.FailsafeOutChannelValues_Ch1_Ch12[ch] > 120) Setup.Rx.FailsafeOutChannelValues_Ch1_Ch12[ch] = 0;
@@ -408,6 +408,7 @@ void setup_sanitize_config(uint8_t config_id)
     // should be 0xFF'ed
 
     Setup.Tx[config_id].__SerialLinkMode = 0xFF;
+    Setup.Rx.__Buzzer = 0xFF;
     Setup.Rx.__RadioStatusMethod = 0xFF;
 
     for (uint8_t n = 0; n < sizeof(Setup.spare)/sizeof(Setup.spare[0]); n++) Setup.spare[n] = 0xFF;
@@ -477,6 +478,7 @@ void configure_mode(uint8_t mode)
 
     }
 
+    // Sx2
     Config.Sx2.LoraConfigIndex = Config.Sx.LoraConfigIndex;
 
 #ifdef DEVICE_HAS_DUAL_SX126x_SX128x
@@ -791,6 +793,13 @@ void setup_reload(void)
 #define SETUPLAYOUT_L0_3_29  329 // layout version from v0.3.29 - v0.3.34
 #define SETUPLAYOUT_L0_3_35  335 // layout version from v0.3.35 onwards
 
+#ifdef DEVICE_IS_TRANSMITTER
+#define SETUP_MARKER_NEW_STR  SETUP_MARKER_TX_STR
+#endif
+#ifdef DEVICE_IS_RECEIVER
+#define SETUP_MARKER_NEW_STR  SETUP_MARKER_RX_STR
+#endif
+
 
 void setup_init(void)
 {
@@ -807,7 +816,12 @@ bool doEEPROMwrite;
     }
 
     if (ee_status != EE_STATUS_OK) setup_clear(); // force default
-    if ((strncmp(Setup.MarkerStr, SETUP_MARKER_STR, 16) != 0)) setup_clear(); // force default
+
+    if ((strncmp(Setup.MarkerStr, SETUP_MARKER_NEW_STR, 16) != 0) &&
+        (strncmp(Setup.MarkerStr, SETUP_MARKER_OLD_STR, 16) != 0)) {
+        setup_clear(); // force default
+    }
+
 #ifdef SETUP_FORCE_COMMON_CONF
     setup_clear(); // force default
 #endif
@@ -818,11 +832,11 @@ bool doEEPROMwrite;
             strstrbufcpy(Setup.Common[0].BindPhrase, Setup.__BindPhrase, 6);
             Setup.Common[0].FrequencyBand = Setup.__FrequencyBand;
             Setup.Common[0].Mode = Setup.__Mode;
-            for (uint8_t id = 1; id < SETUP_CONFIG_LEN; id++) setup_default(id); // default all other tables
+            for (uint8_t id = 1; id < SETUP_CONFIG_NUM; id++) setup_default(id); // default all other tables
             Setup._ConfigId = 0;
         } else
         if (Setup.Layout < SETUPLAYOUT_L0_3_35) {
-            for (uint8_t id = 0; id < SETUP_CONFIG_LEN; id++) {
+            for (uint8_t id = 0; id < SETUP_CONFIG_NUM; id++) {
                 // Tx ChannelSource rearranged
                 uint8_t tx_channel_source = Setup.Tx[id].ChannelsSource;
                 switch (tx_channel_source) {
@@ -837,7 +851,7 @@ bool doEEPROMwrite;
                 }
             }
         } else {
-            for (uint8_t id = 0; id < SETUP_CONFIG_LEN; id++) setup_default(id);
+            for (uint8_t id = 0; id < SETUP_CONFIG_NUM; id++) setup_default(id);
             Setup._ConfigId = 0;
         }
         Setup.Layout = SETUPLAYOUT;
@@ -847,8 +861,8 @@ bool doEEPROMwrite;
         Setup.Version = VERSION;
         doEEPROMwrite = true;
     }
-    if ((strncmp(Setup.MarkerStr, SETUP_MARKER_STR, 16) != 0)) {
-        strbufstrcpy((char*)Setup.MarkerStr, SETUP_MARKER_STR, 16);
+    if ((strncmp(Setup.MarkerStr, SETUP_MARKER_NEW_STR, 16) != 0)) {
+        strbufstrcpy((char*)Setup.MarkerStr, SETUP_MARKER_NEW_STR, 16);
         strbufstrcpy((char*)Setup.MarkerEnd, SETUP_MARKEREND_STR, 8);
         doEEPROMwrite = true;
     }
@@ -857,19 +871,12 @@ bool doEEPROMwrite;
     }
 
 #ifdef DEVICE_IS_TRANSMITTER
-    if (Setup._ConfigId >= SETUP_CONFIG_LEN) Setup._ConfigId = 0;
+    if (Setup._ConfigId >= SETUP_CONFIG_NUM) Setup._ConfigId = 0;
 
-    if (Setup.Tx[Setup._ConfigId].ChannelsSource == CHANNEL_SOURCE_MBRIDGE ||
-        Setup.Tx[Setup._ConfigId].ChannelsSource == CHANNEL_SOURCE_CRSF) {
-        // config id is supported
-        // ensure that they all have the same channel_source
-        for (uint8_t id = 0; id < SETUP_CONFIG_LEN; id++) {
-            Setup.Tx[id].ChannelsSource = Setup.Tx[Setup._ConfigId].ChannelsSource;
-        }
-    } else {
-        // config id is not supported, so force config_id = 0 page
-        if (Setup._ConfigId > 0) Setup.Tx[0] = Setup.Tx[Setup._ConfigId]; // copy all settings to page 0
-        Setup._ConfigId = 0;
+    // ensure that all config id's have the same channel_source
+    // otherwise it can be very confusing concerning how to communicate with the module
+    for (uint8_t id = 0; id < SETUP_CONFIG_NUM; id++) {
+        Setup.Tx[id].ChannelsSource = Setup.Tx[Setup._ConfigId].ChannelsSource;
     }
 #else
     Setup._ConfigId = 0;
