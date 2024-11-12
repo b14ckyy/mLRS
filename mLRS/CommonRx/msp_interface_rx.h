@@ -96,6 +96,8 @@ class tRxMsp
 
     void telm_set_default_rate(uint8_t n) { telm[n].rate = (telm_freq[n] > 0) ? 10 / telm_freq[n] : 0; } // 0 = off, do not send
 
+    void send_request(uint16_t function);
+
     uint8_t inav_flight_modes_box_mode_flags[INAV_FLIGHT_MODES_COUNT]; // store info from MSP_BOXNAMES
 
     // miscellaneous
@@ -173,7 +175,9 @@ void tRxMsp::Do(void)
 
                 if (msp_msg_ser_in.type == MSP_TYPE_RESPONSE) { // this is a response from the FC
                     if (msp_msg_ser_in.function == MSP2_INAV_STATUS && telm[MSP_TELM_BOXNAMES_ID].rate == 0) {
+                        // when we get a MSP2_INAV_STATUS
                         // send out our home-brewed MSPX_STATUS message in addition
+                        // do only after we have seen MSP_BOXNAMES
                         // is being send before original message
                         uint32_t flight_mode = 0;
                         uint8_t* boxflags = ((tMspInavStatus*)(msp_msg_ser_in.payload))->msp_box_mode_flags;
@@ -183,7 +187,13 @@ void tRxMsp::Do(void)
                                 flight_mode |= ((uint32_t)1 << n);
                             }
                         }
-                        uint16_t len = msp_generate_v2_frame_bufX(_buf, MSP_TYPE_RESPONSE, MSPX_STATUS, (uint8_t*)(&flight_mode), 4);
+                        uint16_t len = msp_generate_v2_frame_bufX(
+                            _buf,
+                            MSP_TYPE_RESPONSE,
+                            MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE,
+                            MSPX_STATUS,
+                            (uint8_t*)(&flight_mode),
+                            sizeof(flight_mode));
                         fifo_link_out.PutBuf(_buf, len);
                     }
                     if (msp_msg_ser_in.function == MSP_BOXNAMES) {
@@ -196,7 +206,13 @@ void tRxMsp::Do(void)
 
                         telm[MSP_TELM_BOXNAMES_ID].rate = 0; // disable MSP_BOXNAMES requesting
 
-                        uint16_t len = msp_generate_v2_frame_bufX(_buf, MSP_TYPE_RESPONSE, MSP_BOXNAMES, new_payload, new_len);
+                        uint16_t len = msp_generate_v2_frame_bufX(
+                            _buf,
+                            MSP_TYPE_RESPONSE,
+                            MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE,
+                            MSP_BOXNAMES,
+                            new_payload,
+                            new_len);
                         fifo_link_out.PutBuf(_buf, len);
 
                         send = false; // mark as handled
@@ -271,8 +287,7 @@ dbg.puts(u16toBCD_s(msp_msg_ser_in.len));
             if (telm[n].rate == 0) continue; // disabled
             INCc(telm[n].cnt, telm[n].rate);
             if (!telm[n].cnt && (tnow_ms - telm[n].tlast_ms) >= 3500) { // we want to send and did not got a request recently
-                uint16_t len = msp_generate_v2_request_to_frame_buf(_buf, MSP_TYPE_REQUEST, telm_function[n]);
-                serial.putbuf(_buf, len);
+                send_request(telm_function[n]);
 //dbg.puts(u16toHEX_s(telm_function[n]));dbg.puts(" ");
             }
         }
@@ -337,11 +352,24 @@ void tRxMsp::flush(void)
 }
 
 
+void tRxMsp::send_request(uint16_t function)
+{
+    uint16_t len = msp_generate_v2_request_to_frame_buf(
+        _buf,
+        MSP_TYPE_REQUEST,
+        MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE,
+        function);
+
+    serial.putbuf(_buf, len);
+}
+
+
 void tRxMsp::send_rc_channels(void)
 {
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
+        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE
         MSP_SET_RAW_RC,
         (uint8_t*)&rc_channels,
         MSP_SET_RAW_RC_LEN);
@@ -365,6 +393,7 @@ void tRxMsp::send_rc_link_stats(void)
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
+        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE
         MSP2_COMMON_SET_MSP_RC_LINK_STATS,
         (uint8_t*)&payload,
         MSP_COMMON_SET_MSP_RC_LINK_STATS_LEN);
@@ -419,6 +448,7 @@ static uint32_t tlast_ms = 0;
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
+        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // MSP_FLAG_NONE
         MSP2_COMMON_SET_MSP_RC_INFO,
         (uint8_t*)&payload,
         MSP_COMMON_SET_MSP_RC_INFO_LEN);
