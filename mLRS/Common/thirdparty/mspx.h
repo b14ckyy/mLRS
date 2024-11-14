@@ -557,11 +557,11 @@ void msp_msg_recalculate_crc(msp_message_t* const msg)
 
 
 /* not used
-uint16_t msp_generate_v2_request_to_msg(msp_message_t* const msg, uint8_t type, uint16_t function)
+uint16_t msp_generate_v2_request_to_msg(msp_message_t* const msg, uint8_t type, uint8_t flag, uint16_t function)
 {
     msg->magic2 = MSP_MAGIC_2_V2;
     msg->type = type;
-    msg->flag = 0;
+    msg->flag = flag;
     msg->function = function;
     msg->len = 0;
     msg->checksum = crsf_crc8_calc(0, msg->flag);
