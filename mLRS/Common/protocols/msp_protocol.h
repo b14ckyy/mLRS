@@ -11,7 +11,7 @@
 // STX1           '$'
 // STX2           'X'
 // type           '<', '>', '!'
-// flag           0x01: do not respond, 0x02: source id 1
+// flag           0x01: do not respond, 0x02: source id rc link
 // function_1     LSB
 // function_2     MSB
 // len_1          LSB
