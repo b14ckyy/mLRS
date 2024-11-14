@@ -375,6 +375,7 @@ void tRxMsp::send_rc_channels(void)
 {
     uint32_t tnow_ms = millis32();
     if ((tnow_ms - rc_channels_tlast_ms) < 19) return; // don't send too fast, MSP-RC is not for racing
+    rc_channels_tlast_ms = tnow_ms;
 
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
