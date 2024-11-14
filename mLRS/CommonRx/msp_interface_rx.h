@@ -58,6 +58,10 @@ class tRxMsp
     bool inject_rc_info;
     bool rc_link_stats_disabled;
     bool rc_info_disabled;
+    uint32_t rc_channels_tlast_ms;
+    uint32_t rc_link_stats_tlast_ms;
+    uint32_t rc_info_tlast_ms = 0;
+    int8_t rc_info_power_dbm_last = 125;
 
     void send_rc_channels(void);
     void send_rc_link_stats(void);
@@ -85,19 +89,17 @@ class tRxMsp
         1,  // 1 Hz = 10*100 ms, MSP_INAV_ANALOG
         2,  // 2 Hz = 5*100 ms, MSP_RAW_GPS
         2,  // 2 Hz = 5*100 ms, MSP_ALTITUDE
-        1,  // this is set to zero once it is gotten once, disables request
+        1,  // this is set to zero once MSP_BOXNAMES has been gotten once, disables request
     };
 
     typedef struct {
-        uint8_t rate;
+        uint8_t rate; // rate determined from telm_freq, or 0 = off, do not send
         uint8_t cnt;
         uint32_t tlast_ms; // time of last request received from a gcs
     } tMspTelm;
     tMspTelm telm[MSP_TELM_COUNT];
 
-    void telm_set_default_rate(uint8_t n) { telm[n].rate = (telm_freq[n] > 0) ? 10 / telm_freq[n] : 0; } // 0 = off, do not send
-
-    void send_request(uint16_t function);
+    void telm_set_default_rate(uint8_t n) { telm[n].rate = (telm_freq[n] > 0) ? 10 / telm_freq[n] : 0; }
 
     uint8_t inav_flight_modes_box_mode_flags[INAV_FLIGHT_MODES_COUNT]; // store info from MSP_BOXNAMES
 
@@ -119,6 +121,10 @@ void tRxMsp::Init(void)
     inject_rc_info = false;
     rc_link_stats_disabled = false;
     rc_info_disabled = false;
+    rc_channels_tlast_ms = 0;
+    rc_link_stats_tlast_ms = 0;
+    rc_info_tlast_ms = 0;
+    rc_info_power_dbm_last = 125;
 
     tick_tlast_ms = 0;
     for (uint8_t n = 0; n < MSP_TELM_COUNT; n ++) {
@@ -367,6 +373,9 @@ void tRxMsp::send_request(uint16_t function)
 
 void tRxMsp::send_rc_channels(void)
 {
+    uint32_t tnow_ms = millis32();
+    if ((tnow_ms - rc_channels_tlast_ms) < 19) return; // don't send too fast, MSP-RC is not for racing
+
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
@@ -381,7 +390,11 @@ void tRxMsp::send_rc_channels(void)
 
 void tRxMsp::send_rc_link_stats(void)
 {
-    tMspCommonSetMspRcLinkStats payload;
+tMspCommonSetMspRcLinkStats payload;
+
+    uint32_t tnow_ms = millis32();
+    if ((tnow_ms - rc_link_stats_tlast_ms) < 200) return; // really slow down, INAV FCs can be over-burdened
+    rc_link_stats_tlast_ms = tnow_ms;
 
     payload.sublink_id = 0;
     payload.valid_link = 1;
@@ -405,17 +418,14 @@ void tRxMsp::send_rc_link_stats(void)
 
 void tRxMsp::send_rc_info(void)
 {
-static int8_t power_dbm_last = 125;
-static uint32_t tlast_ms = 0;
+tMspCommonSetMspRcInfo payload;
 
     uint32_t tnow_ms = millis32();
     int8_t power_dbm = sx.RfPower_dbm();
-    if ((tnow_ms - tlast_ms < 2500) && (power_dbm == power_dbm_last)) return; // no time nor no need to send
+    if ((tnow_ms - rc_info_tlast_ms < 2500) && (power_dbm == rc_info_power_dbm_last)) return; // not yet time nor no need to send
 
-    tlast_ms = tnow_ms;
-    power_dbm_last = power_dbm;
-
-    tMspCommonSetMspRcInfo payload;
+    rc_info_tlast_ms = tnow_ms;
+    rc_info_power_dbm_last = power_dbm;
 
     payload.sublink_id = 0;
     payload.uplink_tx_power = cvt_power(power_dbm); // WRONG, should be tx power, but to have something we send rx power
