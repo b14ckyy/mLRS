@@ -380,7 +380,7 @@ void tRxMsp::send_rc_channels(void)
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
-        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // avoid response message from flight controller
+        MSP_FLAG_SOURCE_ID_RC_LINK | MSP_FLAG_NO_RESPONSE, // avoid response message from flight controller
         MSP_SET_RAW_RC,
         (uint8_t*)&rc_channels,
         MSP_SET_RAW_RC_LEN);
@@ -408,7 +408,7 @@ tMspCommonSetMspRcLinkStats payload;
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
-        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // flight controller should drop response, but can't hurt
+        MSP_FLAG_SOURCE_ID_RC_LINK | MSP_FLAG_NO_RESPONSE, // avoid response message from flight controller
         MSP2_COMMON_SET_MSP_RC_LINK_STATS,
         (uint8_t*)&payload,
         MSP_COMMON_SET_MSP_RC_LINK_STATS_LEN);
@@ -460,7 +460,7 @@ tMspCommonSetMspRcInfo payload;
     uint16_t len = msp_generate_v2_frame_buf(
         _buf,
         MSP_TYPE_REQUEST,
-        MSP_FLAG_NO_RESPONSE | MSP_FLAG_SOURCE_ID_RC_LINK, // flight controller should drop response, but can't hurt
+        MSP_FLAG_SOURCE_ID_RC_LINK | MSP_FLAG_NO_RESPONSE, // avoid response message from flight controller
         MSP2_COMMON_SET_MSP_RC_INFO,
         (uint8_t*)&payload,
         MSP_COMMON_SET_MSP_RC_INFO_LEN);
