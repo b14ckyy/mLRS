@@ -14,7 +14,6 @@
 // TODO: share fixed buffers with mavlink interface
 
 
-#ifdef USE_FEATURE_MAVLINKX
 #include "../Common/protocols/msp_protocol.h"
 #include "../Common/thirdparty/mspx.h"
 
@@ -37,6 +36,8 @@ class tTxMsp
     bool available(void);
     uint8_t getc(void);
     void flush(void);
+
+    void InjectCrsfMspRequest(msp_message_t* const msg); // inject CRSF MSP request into link
 
   private:
 
@@ -125,7 +126,7 @@ void tTxMsp::parse_link_in_serial_out(char c)
             switch (msp_msg_link_in.function) {
             case MSP_BOXNAMES:
 //dbg.puts("\nMBC "); for(uint16_t i= 0; i< msp_msg_link_in.len; i++) dbg.puts(u8toHEX_s(msp_msg_link_in.payload[i]));
-                msp_msg_link_in.flag = MSP_FLAG_NONE; // it should be set to MSP_FLAG_SOURCE_ID_RC_LINK, not what we want
+                msp_msg_link_in.flag &= ~MSP_FLAG_SOURCE_ID_RC_LINK; // clear RC_LINK but preserve CRSF passthrough flag
                 // decompress
                 mspX_boxnames_payload_decompress(&msp_msg_link_in, _buf); // we can use the buffer
 //dbg.puts("\nMB ");for(uint16_t i = 0; i < msp_msg_link_in.len; i++) dbg.putc(msp_msg_link_in.payload[i]);
@@ -136,19 +137,24 @@ void tTxMsp::parse_link_in_serial_out(char c)
                 break;
             }
 
+            // route CRSF passthrough responses back to CRSF interface
+            if (msp_msg_link_in.flag & MSP_FLAG_CRSF_PASSTHROUGH) {
+                crsf.MspCrsfSendResponse(&msp_msg_link_in);
+                send = false;
+            } else
             if (msp_msg_link_in.flag & MSP_FLAG_SOURCE_ID_RC_LINK) {
                 // it's requested by the receiver, catch it
                 send = false;
             }
         }
 
-        if (send) {
+        if (send && ser) {
             uint16_t len = msp_msg_to_frame_buf(_buf, &msp_msg_link_in);
             ser->putbuf(_buf, len);
         }
 
-        // allow crsf class to capture it
-        if (msp_msg_link_in.type == MSP_TYPE_RESPONSE) {
+        // allow crsf class to capture it (but not CRSF passthrough responses, those are already routed)
+        if (msp_msg_link_in.type == MSP_TYPE_RESPONSE && !(msp_msg_link_in.flag & MSP_FLAG_CRSF_PASSTHROUGH)) {
             crsf.TelemetryHandleMspMsg(&msp_msg_link_in);
         }
 
@@ -174,9 +180,7 @@ dbg.puts(u8toHEX_s(crc8));
 
 void tTxMsp::putc(char c)
 {
-    if (!ser) return;
-
-    // parse link in -> serial out
+    // parse link in -> serial out (also routes CRSF passthrough responses to CRSF)
     parse_link_in_serial_out(c);
 }
 
@@ -208,22 +212,16 @@ void tTxMsp::flush(void)
 }
 
 
-#else // !USE_FEATURE_MAVLINKX
-
-class tTxMsp
+void tTxMsp::InjectCrsfMspRequest(msp_message_t* const msg)
 {
-  public:
-    void Init(tSerialBase* const _serialport, tSerialBase* const _serial2port) {}
-    void Do(void) {}
-    void FrameLost(void) {}
+    // set the CRSF passthrough flag so we can identify the response
+    msg->flag |= MSP_FLAG_CRSF_PASSTHROUGH;
 
-    void putc(char c) {}
-    bool available(void) { return false; }
-    uint8_t getc(void) { return 0; }
-    void flush(void) {}
-};
-
-#endif // USE_FEATURE_MAVLINKX
+    if (fifo_link_out.HasSpace(MSP_FRAME_LEN_MAX + 16)) {
+        uint16_t len = msp_msg_to_frame_bufX(_buf, msg); // converting to mspX
+        fifo_link_out.PutBuf(_buf, len);
+    }
+}
 
 
 #endif // MSP_INTERFACE_TX_H

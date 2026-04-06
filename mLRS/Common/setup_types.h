@@ -31,6 +31,8 @@ typedef enum : uint8_t {
     SETUP_FREQUENCY_BAND_433_MHZ,
     SETUP_FREQUENCY_BAND_70_CM_HAM,
     SETUP_FREQUENCY_BAND_866_MHZ_IN,
+    SETUP_FREQUENCY_DUAL_BAND_915_MHZ_2P4_GHZ,
+    SETUP_FREQUENCY_DUAL_BAND_868_MHZ_2P4_GHZ,
     SETUP_FREQUENCY_BAND_NUM,
 } SETUP_FREQUENCY_BAND_ENUM;
 
@@ -49,7 +51,10 @@ typedef enum : uint8_t {
 } SX_FHSS_FREQUENCY_BAND_ENUM;
 
 
+// used by setup
 SX_FHSS_FREQUENCY_BAND_ENUM cvt_to_sx_fhss_frequency_band(uint8_t setup_frequency_band);
+
+// used by fhss, for bind only
 SETUP_FREQUENCY_BAND_ENUM cvt_to_setup_frequency_band(uint8_t sx_fhss_frequency_band);
 
 
@@ -115,21 +120,14 @@ typedef enum {
 typedef enum {
     SERIAL_LINK_MODE_TRANSPARENT = 0,
     SERIAL_LINK_MODE_MAVLINK,
-#ifdef USE_FEATURE_MAVLINKX
     SERIAL_LINK_MODE_MAVLINK_X,
     SERIAL_LINK_MODE_MSP_X,
-#endif
     SERIAL_LINK_MODE_NUM,
 } SERIAL_LINK_MODE_ENUM;
 
 
-#ifndef USE_FEATURE_MAVLINKX
-  #define SERIAL_LINK_MODE_IS_MAVLINK(x)  ((x) == SERIAL_LINK_MODE_MAVLINK)
-  #define SERIAL_LINK_MODE_IS_MSP(x)      (false)
-#else
-  #define SERIAL_LINK_MODE_IS_MAVLINK(x)  ((x) == SERIAL_LINK_MODE_MAVLINK || (x) == SERIAL_LINK_MODE_MAVLINK_X)
-  #define SERIAL_LINK_MODE_IS_MSP(x)      ((x) == SERIAL_LINK_MODE_MSP_X)
-#endif
+#define SERIAL_LINK_MODE_IS_MAVLINK(x)  ((x) == SERIAL_LINK_MODE_MAVLINK || (x) == SERIAL_LINK_MODE_MAVLINK_X)
+#define SERIAL_LINK_MODE_IS_MSP(x)      ((x) == SERIAL_LINK_MODE_MSP_X)
 
 
 typedef enum {
@@ -289,8 +287,8 @@ typedef enum {
 
 //-------------------------------------------------------
 // Config Enums
+// ATTENTION: numbers must match config arrays in sx drivers !!
 //-------------------------------------------------------
-// numbers must match config arrays in sx drivers !!
 
 typedef enum {
     SX128x_LORA_CONFIG_BW800_SF5_CRLI4_5 = 0,
@@ -314,13 +312,23 @@ typedef enum {
 
 
 typedef enum {
-    LR11xx_LORA_CONFIG_BW500_SF5_CR4_5 = 0,
+    LR11xx_LORA_CONFIG_BW500_SF5_CR4_5 = 0, // 900 MHz
     LR11xx_LORA_CONFIG_BW500_SF6_CR4_5,
-    LR11xx_LORA_CONFIG_BW800_SF5_CR4_5,
+    LR11xx_LORA_CONFIG_BW800_SF5_CR4_5, // 2.4 GHz
     LR11xx_LORA_CONFIG_BW800_SF6_CR4_5,
     LR11xx_LORA_CONFIG_BW800_SF7_CR4_5,
     LR11xx_LORA_CONFIG_NUM,
 } LR11xx_LORA_CONFIG_ENUM;
+
+
+typedef enum {
+    LR20xx_LORA_CONFIG_BW500_SF5_CR4_5 = 0, // 900 MHz
+    LR20xx_LORA_CONFIG_BW500_SF6_CR4_5,
+    LR20xx_LORA_CONFIG_BW800_SF5_CR4_5, // 2.4 GHz
+    LR20xx_LORA_CONFIG_BW800_SF6_CR4_5,
+    LR20xx_LORA_CONFIG_BW800_SF7_CR4_5,
+    LR20xx_LORA_CONFIG_NUM,
+} LR20xx_LORA_CONFIG_ENUM;
 
 
 //-------------------------------------------------------

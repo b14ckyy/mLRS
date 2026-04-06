@@ -478,7 +478,6 @@ void tMBridge::Unlock(void)
 //-------------------------------------------------------
 // handler
 
-void mbridge_start_ParamRequestList(void);
 void mbridge_start_ParamRequestByIndex(uint8_t idx);
 
 
@@ -505,10 +504,6 @@ tMBridgeRequestCmd* request = (tMBridgeRequestCmd*)payload;
         cmd_fifo.Put(MBRIDGE_CMD_INFO);
         break;
 
-    case MBRIDGE_CMD_PARAM_REQUEST_LIST:
-        mbridge_start_ParamRequestList();
-        break;
-
     case MBRIDGE_CMD_PARAM_ITEM: {
         uint8_t idx = request->param_item.index;
         //if (request->name[0] != 0) { // name is specified, so search for index of parameter
@@ -533,6 +528,8 @@ void mbridge_send_LinkStats(void)
 {
 tMBridgeLinkStats lstats = {};
 
+    int16_t receiver_sensitivity_dbm = SX_OR_SX2(sx.ReceiverSensitivity_dbm(), sx2.ReceiverSensitivity_dbm());
+
     lstats.LQ_serial = stats.GetLQ_serial(); // = LQ_valid_received; // number of valid packets received on transmitter side
     lstats.rssi1_instantaneous = stats.last_rssi1;
     lstats.rssi2_instantaneous = stats.last_rssi2;
@@ -542,7 +539,7 @@ tMBridgeLinkStats lstats = {};
     lstats.rx1_valid = stats.rx1_valid;
     lstats.rx2_valid = stats.rx2_valid;
 
-    lstats.rssi_instantaneous_percent = crsf_cvt_rssi_percent(stats.GetLastRssi(), sx.ReceiverSensitivity_dbm());
+    lstats.rssi_instantaneous_percent = crsf_cvt_rssi_percent(stats.GetLastRssi(), receiver_sensitivity_dbm);
 
     // receiver side of things
 
@@ -552,7 +549,7 @@ tMBridgeLinkStats lstats = {};
     lstats.receiver_receive_antenna = stats.received_antenna;
     lstats.receiver_transmit_antenna = stats.received_transmit_antenna;
 
-    lstats.receiver_rssi_instantaneous_percent = crsf_cvt_rssi_percent(stats.received_rssi, sx.ReceiverSensitivity_dbm());
+    lstats.receiver_rssi_instantaneous_percent = crsf_cvt_rssi_percent(stats.received_rssi, receiver_sensitivity_dbm);
 
     // further stats acquired on transmitter side
 
@@ -643,8 +640,7 @@ tMBridgeDeviceItem item = {};
 
 
 uint8_t param_idx; // next param index to send
-uint8_t param_itemtype_to_send; // count through sending PARAM_ITEM, PARAM_ITEM2, PARAM_ITEM3
-bool param_by_index; // to indicate sending requested by list or by index
+uint8_t param_itemtype_to_send; // count through sending PARAM_ITEM, PARAM_ITEM2, PARAM_ITEM3_4
 char param_optstr[96]; // is currently limited to 67 max
 
 
@@ -700,19 +696,8 @@ void mbridge_start_ParamRequestByIndex(uint8_t idx)
 {
     param_idx = idx;
     param_itemtype_to_send = 0;
-    param_by_index = true;
 
     mbridge.cmd_fifo.Put(MBRIDGE_CMD_PARAM_ITEM); // trigger sending out
-}
-
-
-void mbridge_start_ParamRequestList(void)
-{
-    param_idx = 0;
-    param_itemtype_to_send = 0;
-    param_by_index = false;
-
-    mbridge.cmd_fifo.Put(MBRIDGE_CMD_PARAM_ITEM); // trigger sending out first
 }
 
 
@@ -725,8 +710,6 @@ void mbridge_send_ParamItem(void)
         mbridge.SendCommand(MBRIDGE_CMD_PARAM_ITEM, (uint8_t*)&item);
         return;
     }
-
-    bool item3_needed = false; // if a LIST parameter has a long option string, we send a 3rd or 4th ParamItem
 
     if (param_itemtype_to_send == 0) {
         tMBridgeParamItem item = {};
@@ -756,6 +739,7 @@ void mbridge_send_ParamItem(void)
     } else
     if (param_itemtype_to_send == 1) {
         tMBridgeParamItem2 item2 = {};
+        bool item3_needed = false; // if a LIST parameter has a long option string, we send a 3rd or 4th ParamItem
         item2.index = param_idx;
         switch (SetupParameter[param_idx].type) {
         case SETUP_PARAM_TYPE_INT8:
@@ -784,25 +768,25 @@ void mbridge_send_ParamItem(void)
             param_itemtype_to_send = 0; // done with this parameter
             param_idx++;
 
-            if (param_by_index) return; // if requested by index we stop
+            return; // last param item, so stop
         }
     } else
     if (param_itemtype_to_send == 2) {
         tMBridgeParamItem3_4 item3 = {};
         item3.index = param_idx;
         strbufstrcpy(item3.options2_23, param_optstr + 21, 23);
-        if (strlen(param_optstr) >= 21+23) item3_needed = true; // we need yet another one
+        bool item4_needed = (strlen(param_optstr) >= 21+23); // we need yet another one
 
         mbridge.SendCommand(MBRIDGE_CMD_PARAM_ITEM3_4, (uint8_t*)&item3);
 
-        if (item3_needed) {
+        if (item4_needed) {
             param_itemtype_to_send = 3; // we need to send a 4th ParamItem
         } else {
             // next param item
             param_itemtype_to_send = 0; // done with this parameter
             param_idx++;
 
-            if (param_by_index) return; // if requested by index we stop
+            return; // last param item, so stop
         }
 
     } else
@@ -820,7 +804,7 @@ void mbridge_send_ParamItem(void)
         param_itemtype_to_send = 0; // done with this parameter
         param_idx++;
 
-        if (param_by_index) return; // if requested by index we stop
+        return; // last param item, so stop
     }
 
     mbridge.cmd_fifo.Put(MBRIDGE_CMD_PARAM_ITEM); // trigger sending out next

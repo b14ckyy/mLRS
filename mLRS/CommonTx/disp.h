@@ -46,7 +46,6 @@ extern tSetup Setup;
 extern tGlobalConfig Config;
 extern tTxInfo info;
 extern tTasks tasks;
-void i2c_spin(uint16_t chunksize);
 
 
 #define DISP_START_PAGE_TMO_MS  SYSTICK_DELAY_MS(1500)
@@ -125,7 +124,6 @@ class tTxDisp
     void DrawNotify(const char* const s);
     void DrawBoot(void);
 
-    void SpinI2C(void);
 
     typedef struct {
         uint8_t list[SETUP_PARAMETER_NUM];
@@ -497,7 +495,6 @@ void tTxDisp::DrawNotify(const char* const s)
     draw_page_notify(s);
     gdisp_update();
     page_modified = false;
-    i2c_spin(GDISPLAY_BUFSIZE); // needed for ESP32 // always draw it directly to the buffer
 }
 
 
@@ -545,11 +542,6 @@ void tTxDisp::Draw(void)
     }
 }
 
-
-void tTxDisp::SpinI2C(void)
-{
-    i2c_spin(64); // for timing on ESP32 see below
-}
 
 
 //-------------------------------------------------------
@@ -716,7 +708,7 @@ int8_t power;
     }
     gdisp_puts(s);
     gdisp_setcurX(85);
-    power = sx.RfPower_dbm();
+    power = SX_OR_SX2( sx.RfPower_dbm() , sx2.RfPower_dbm() );
     if (power >= -9) { stoBCDstr(power, s); gdisp_puts(s); } else { gdisp_puts("-\x7F"); }
     gdisp_setcurX(100);
     if (connected_and_rx_setup_available()) {
@@ -773,14 +765,14 @@ char s[32];
     param_get_val_formattedstr(s, PARAM_INDEX_MODE); // 1 = index of Mode
     gdisp_puts(s);
     gdisp_setcurX(80 + 5);
-    stoBCDstr(sx.ReceiverSensitivity_dbm(), s);
+    stoBCDstr(SX_OR_SX2(sx.ReceiverSensitivity_dbm(),sx2.ReceiverSensitivity_dbm()), s);
     gdisp_puts(s);
     gdisp_puts(" dB");
 
     gdisp_setcurXY(0, 1 * 10 + DISP_CONTENT_Y_BASE);
     gdisp_puts("Power");
     gdisp_setcurX(40);
-    stoBCDstr(sx.RfPower_dbm(), s);
+    stoBCDstr(SX_OR_SX2(sx.RfPower_dbm(),sx2.RfPower_dbm()), s);
     gdisp_puts(s);
     gdisp_setcurX(80);
     stoBCDstr(SetupMetaData.rx_actual_power_dbm, s);
