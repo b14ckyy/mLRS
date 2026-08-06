@@ -41,6 +41,8 @@
 #define SETUP_MSK_TX_IN_MODE          &SetupMetaData.Tx_InMode_allowed_mask // this we generate from the hal
 #define SETUP_MSK_TX_BUZZER           &SetupMetaData.Tx_Buzzer_allowed_mask // this we generate from the hal
 #define SETUP_MSK_TX_WIFIPROT         &SetupMetaData.Tx_WiFiProt_allowed_mask // this we generate from the hal
+#define SETUP_MSK_TX_WIFICHANNEL      &SetupMetaData.Tx_WiFiChannel_allowed_mask // zeroed when a Kite-Link module is detected
+#define SETUP_MSK_TX_WIFIPOWER        &SetupMetaData.Tx_WiFiPower_allowed_mask // zeroed when a Kite-Link module is detected
 
 // Rx only
 #define SETUP_MSK_RX_OUT_MODE         &SetupMetaData.Rx_OutMode_allowed_mask // this we get from the receiver
@@ -107,8 +109,8 @@
 
 #define SETUP_PARAMETER_LIST_TX_ESP \
   X( Setup.Tx[0].WifiProtocol,      LIST, "Tx Wifi Protocol", "TX_WIFI_PROT",     0,0,0,"", "TCP,UDP,BT,UDP STA,BLE,ESPNOW", SETUP_MSK_TX_WIFIPROT )\
-  X( Setup.Tx[0].WifiChannel,       LIST, "Tx Wifi Channel",  "TX_WIFI_CHANNEL",  0,0,0,"", "1,6,11,13", MSK_ALL )\
-  X( Setup.Tx[0].WifiPower,         LIST, "Tx Wifi Power",    "TX_WIFI_POWER",    0,0,0,"", "low,med,max", MSK_ALL )
+  X( Setup.Tx[0].WifiChannel,       LIST, "Tx Wifi Channel",  "TX_WIFI_CHANNEL",  0,0,0,"", "1,6,11,13", SETUP_MSK_TX_WIFICHANNEL )\
+  X( Setup.Tx[0].WifiPower,         LIST, "Tx Wifi Power",    "TX_WIFI_POWER",    0,0,0,"", "low,med,max", SETUP_MSK_TX_WIFIPOWER )
 
 #if defined USE_ESP_WIFI_BRIDGE_CONFIGURE
 #define SETUP_PARAMETER_LIST_TX  SETUP_PARAMETER_LIST_TX_MAIN  SETUP_PARAMETER_LIST_TX_ESP

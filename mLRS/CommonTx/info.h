@@ -22,6 +22,7 @@ class tTxInfo
     {
         wireless.device_id = 0; // unknown
         wireless.device_name[0] = '\0'; // unknown
+        wireless.kitelink = false;
     }
 
     bool WirelessDeviceName_cli(char* const s)
@@ -54,6 +55,7 @@ class tTxInfo
     struct {
         uint16_t device_id; // device_id as used in SSID
         char device_name[48]; // SSID
+        bool kitelink; // a Kite-Link module was detected on the wireless bridge serial
     } wireless;
 };
 

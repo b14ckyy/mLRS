@@ -61,6 +61,7 @@ typedef enum {
     PAGE_STARTUP = 0,
     PAGE_NOTIFY_BIND,
     PAGE_NOTIFY_STORE,
+    PAGE_NOTIFY_KITE_RESET,
 
     // left-right navigation menu
     PAGE_MAIN,
@@ -95,6 +96,9 @@ typedef enum {
     DISP_ACTION_BIND,
     DISP_ACTION_BOOT,
     DISP_ACTION_FLASH_ESP,
+    DISP_ACTION_KITE_PAIR,
+    DISP_ACTION_KITE_SETHOST,
+    DISP_ACTION_KITE_FACTRST,
 } DISP_ACTION_ENUM;
 
 
@@ -106,6 +110,11 @@ const uint8_t disp_actions[] = {
 #endif
 #ifdef USE_ESP_WIFI_BRIDGE
     DISP_ACTION_FLASH_ESP,
+#endif
+#ifdef USE_ESP_WIFI_BRIDGE_CONFIGURE
+    DISP_ACTION_KITE_PAIR, // shown only when a Kite-Link module was detected
+    DISP_ACTION_KITE_SETHOST,
+    DISP_ACTION_KITE_FACTRST,
 #endif
 };
 
@@ -331,6 +340,24 @@ uint16_t keys, i, keys_new;
         return;
     }
 
+    // kite-link factory reset confirmation
+    if (page == PAGE_NOTIFY_KITE_RESET) {
+        if (key_has_been_pressed(KEY_CENTER)) {
+            tasks.SetDisplayTask(TX_TASK_KITE_FACTORYRESET);
+            keys_has_been_pressed = 0;
+            page = PAGE_ACTIONS;
+            page_init();
+            page_modified = true;
+        } else
+        if (keys_has_been_pressed) { // any other key aborts
+            keys_has_been_pressed = 0;
+            page = PAGE_ACTIONS;
+            page_init();
+            page_modified = true;
+        }
+        return;
+    }
+
     // handle connection & receiver
     if (connected_last != connected()) { // connection state has changed
         page_modified = true; // redraws, and avoids calling gdisp_update() multiple time
@@ -439,7 +466,12 @@ void tTxDisp::page_init(void)
         case PAGE_COMMON: idx_max = common_list.num - 1; break;
         case PAGE_TX: idx_max = tx_list.num - 1; break;
         case PAGE_RX: idx_max = rx_list.num - 1; break;
-        case PAGE_ACTIONS: idx_max = DISP_ACTION_NUM - 1; break;
+        case PAGE_ACTIONS:
+            idx_max = DISP_ACTION_NUM - 1;
+#ifdef USE_ESP_WIFI_BRIDGE_CONFIGURE
+            if (!info.wireless.kitelink) idx_max -= 3; // hide the Kite-Link actions
+#endif
+            break;
     }
 
     subpage = SUBPAGE_DEFAULT;
@@ -468,6 +500,17 @@ void tTxDisp::run_action(void)
         break;
     case DISP_ACTION_FLASH_ESP:
         tasks.SetDisplayTask(TX_TASK_FLASH_ESP);
+        break;
+    case DISP_ACTION_KITE_PAIR:
+        tasks.SetDisplayTask(TX_TASK_KITE_PAIR);
+        break;
+    case DISP_ACTION_KITE_SETHOST:
+        tasks.SetDisplayTask(TX_TASK_KITE_SETHOST);
+        break;
+    case DISP_ACTION_KITE_FACTRST:
+        keys_has_been_pressed = 0; // require a fresh key press to confirm
+        page = PAGE_NOTIFY_KITE_RESET;
+        page_modified = true;
         break;
     }
 }
@@ -524,6 +567,7 @@ void tTxDisp::Draw(void)
             case PAGE_ACTIONS: draw_page_actions(); break;
             case PAGE_NOTIFY_BIND: draw_page_notify("BINDING"); break;
             case PAGE_NOTIFY_STORE: draw_page_notify("STORE"); break;
+            case PAGE_NOTIFY_KITE_RESET: draw_page_notify("KL RESET\nSURE ?"); break;
         }
 
 //uint32_t t2 = micros16(); //HAL_GetTick();
@@ -1053,6 +1097,34 @@ void tTxDisp::draw_page_actions(void)
         gdisp_unsetinverted();
         idx++;
     }
+
+#ifdef USE_ESP_WIFI_BRIDGE_CONFIGURE
+    if (!info.wireless.kitelink) return; // Kite-Link actions are hidden otherwise
+
+    if ((idx < DISP_ACTION_NUM) && (disp_actions[idx] == DISP_ACTION_KITE_PAIR)) {
+        gdisp_setcurXY(75, (idx - 2) * 11 + DISP_CONTENT_Y_BASE);
+        if (idx == idx_focused) gdisp_setinverted();
+        gdisp_puts("KL PAIR");
+        gdisp_unsetinverted();
+        idx++;
+    }
+
+    if ((idx < DISP_ACTION_NUM) && (disp_actions[idx] == DISP_ACTION_KITE_SETHOST)) {
+        gdisp_setcurXY(75, (idx - 2) * 11 + DISP_CONTENT_Y_BASE);
+        if (idx == idx_focused) gdisp_setinverted();
+        gdisp_puts("KL HOST");
+        gdisp_unsetinverted();
+        idx++;
+    }
+
+    if ((idx < DISP_ACTION_NUM) && (disp_actions[idx] == DISP_ACTION_KITE_FACTRST)) {
+        gdisp_setcurXY(5, 3 * 11 + DISP_CONTENT_Y_BASE); // below BIND in the left column
+        if (idx == idx_focused) gdisp_setinverted();
+        gdisp_puts("KL RESET");
+        gdisp_unsetinverted();
+        idx++;
+    }
+#endif
 }
 
 

@@ -1253,6 +1253,11 @@ IF_IN(
     case TX_TASK_CLI_ESP_SET_PASSWORD: esp.SetPassword(tasks.GetCliTaskStr()); break;
     case TX_TASK_CLI_ESP_GET_NETWORK_SSID: esp.GetNetSsid(); break;
     case TX_TASK_CLI_ESP_SET_NETWORK_SSID: esp.SetNetSsid(tasks.GetCliTaskStr()); break;
+    case TX_TASK_KITE_PAIR: esp.KitePair(); break;
+    case TX_TASK_KITE_SETHOST: esp.KiteSetHost(); break;
+    case TX_TASK_KITE_FACTORYRESET: esp.KiteFactoryReset(); break;
+    case TX_TASK_CLI_KITE_GET_GWNAME: esp.KiteGetGwName(); break;
+    case TX_TASK_CLI_KITE_SET_GWNAME: esp.KiteSetGwName(tasks.GetCliTaskStr()); break;
     case TX_TASK_HC04_PASSTHROUGH: hc04.EnterPassthrough(); break;
     case TX_TASK_CLI_HC04_GETPIN: hc04.GetPin(); break;
     case TX_TASK_CLI_HC04_SETPIN: hc04.SetPin(tasks.GetCliTaskValue()); break;

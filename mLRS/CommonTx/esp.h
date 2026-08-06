@@ -82,6 +82,11 @@ class tTxEspWifiBridge
     void SetPassword(char* str) {}
     void GetNetSsid(void) {}
     void SetNetSsid(char* str) {}
+    void KitePair(void) {}
+    void KiteSetHost(void) {}
+    void KiteFactoryReset(void) {}
+    void KiteGetGwName(void) {}
+    void KiteSetGwName(char* str) {}
 };
 
 #else
@@ -92,6 +97,7 @@ class tTxEspWifiBridge
 extern volatile uint32_t millis32(void);
 extern tSetup Setup;
 extern tGlobalConfig Config;
+extern tSetupMetaData SetupMetaData;
 extern tSerialPorts Serials;
 extern tTasks tasks;
 
@@ -125,17 +131,28 @@ class tTxEspWifiBridge
     void SetPassword(char* str);
     void GetNetSsid(void);
     void SetNetSsid(char* str);
+    void KitePair(void);
+    void KiteSetHost(void);
+    void KiteFactoryReset(void);
+    void KiteGetGwName(void);
+    void KiteSetGwName(char* str);
 #else
     void GetPassword(void) {}
     void SetPassword(char* str) {}
     void GetNetSsid(void) {}
     void SetNetSsid(char* str) {}
+    void KitePair(void) {}
+    void KiteSetHost(void) {}
+    void KiteFactoryReset(void) {}
+    void KiteGetGwName(void) {}
+    void KiteSetGwName(char* str) {}
 #endif
 
   private:
 #ifdef USE_ESP_WIFI_BRIDGE_CONFIGURE
     bool esp_read(const char* const cmd, char* const res, uint8_t* const len);
     void esp_wait_after_read(const char* const res);
+    bool kite_cmd(const char* const cmd_str);
     void esp_get_info(void);
     void esp_get_ssidpswd(const char* const net_cmd);
     void esp_set_ssidpswd(const char* const net_cmd, char* const str);
@@ -453,7 +470,7 @@ ESP_DBG(dbg.puts("!ENDE!");)
 
 void tTxEspWifiBridge::esp_wait_after_read(const char* const res)
 {
-    if (version >= 10307){ // sends a '*' instead of a '+' if setting had been changed
+    if (version >= 10307 || info.wireless.kitelink){ // sends a '*' instead of a '+' if setting had been changed
         if (res[2] == '+') { // no change, so no need to wait for long
             delay_ms(5);
             return;
@@ -469,6 +486,18 @@ void tTxEspWifiBridge::esp_get_info(void)
 {
 char s[ESP_CMDRES_LEN+2];
 uint8_t len;
+
+    if (info.wireless.kitelink) {
+        info.wireless.device_id = 0;
+        if (esp_read("AT+ID=?", s, &len)) { // OK+ID=<id>
+            info.wireless.device_id = atoi(s + 6);
+        }
+        if (esp_read("AT+GWNAME=?", s, &len) && len > 12) { // OK+GWNAME=<name>, gateway has been given a name
+            s[len-2] = '\0';
+            strncpy(info.wireless.device_name, s + 10, sizeof(info.wireless.device_name)-1);
+        } // else keep the KiteLink-v<version> name recorded at detection
+        return;
+    }
 
     info.wireless.device_name[0] = '\0';
     info.wireless.device_id = 0;
@@ -492,6 +521,11 @@ char s[ESP_CMDRES_LEN+2];
 uint8_t len;
 
     if (!passthrough) return; // needs com and ser
+
+    if (info.wireless.kitelink) {
+        com->puts("  not supported by Kite-Link bridge");com->puts(CLI_LINEND);
+        return;
+    }
 
     if (version < 10309) { // not available before v1.3.09
         com->puts("  not supported by this wireless bridge version");
@@ -521,6 +555,11 @@ char s[ESP_CMDRES_LEN+2];
 uint8_t len;
 
     if (!passthrough) return; // needs com and ser
+
+    if (info.wireless.kitelink) {
+        com->puts("  not supported by Kite-Link bridge");com->puts(CLI_LINEND);
+        return;
+    }
 
     if (version < 10309) { // not available before v1.3.09
         com->puts("  not supported by this wireless bridge version");
@@ -558,6 +597,66 @@ void tTxEspWifiBridge::GetPassword(void) { esp_get_ssidpswd("PSWD"); }
 void tTxEspWifiBridge::SetPassword(char* str) { esp_set_ssidpswd("PSWD", str); }
 void tTxEspWifiBridge::GetNetSsid(void) { esp_get_ssidpswd("NETSSID"); }
 void tTxEspWifiBridge::SetNetSsid(char* str) { esp_set_ssidpswd("NETSSID", str); }
+
+
+bool tTxEspWifiBridge::kite_cmd(const char* const cmd_str)
+{
+char s[ESP_CMDRES_LEN+2];
+uint8_t len;
+
+    if (ser == nullptr) return false;
+
+    if (!info.wireless.kitelink) {
+        if (com) { com->puts("  no Kite-Link bridge detected");com->puts(CLI_LINEND); }
+        return false;
+    }
+
+    esp_gpio0_low(); // force AT mode
+    delay_ms(50); // give it some time // 10 ms was too short
+
+    if (com) {
+        com->puts("  ");
+        for (const char* p = cmd_str; *p != '\0'; p++) if (*p != '\r') com->putc(*p);
+        com->puts("->");
+    }
+    bool ok = esp_read(cmd_str, s, &len);
+    if (com) {
+        if (ok) {
+            s[len-2] = '\0';
+            com->puts(s);com->puts(CLI_LINEND);
+        } else {
+            com->puts("failed");com->puts(CLI_LINEND);
+        }
+    }
+
+    esp_gpio0_high(); // leave forced AT mode
+    return ok;
+}
+
+
+void tTxEspWifiBridge::KitePair(void) { kite_cmd("AT+PAIR"); }
+void tTxEspWifiBridge::KiteSetHost(void) { kite_cmd("AT+SETHOST"); }
+void tTxEspWifiBridge::KiteGetGwName(void) { kite_cmd("AT+GWNAME=?"); }
+
+
+void tTxEspWifiBridge::KiteSetGwName(char* str)
+{
+char cmd_str[64];
+
+    if (strlen(str) < 1 || strlen(str) > 24) return; // checked by cli already, play it safe
+    strcpy(cmd_str, "AT+GWNAME=");
+    strcat(cmd_str, str);
+    strcat(cmd_str, "\r"); // the set is terminated by a CR
+    kite_cmd(cmd_str);
+}
+
+
+void tTxEspWifiBridge::KiteFactoryReset(void)
+{
+    if (kite_cmd("AT+FACTORYRESET")) {
+        if (com) { com->puts("  Kite-Link module resets, restart tx module");com->puts(CLI_LINEND); }
+    }
+}
 
 
 void tTxEspWifiBridge::esp_configure_baudrate(void)
@@ -697,6 +796,14 @@ uint8_t len;
                     found = true;
                     if (strlen(s) > 32) version = version_from_str(s + 28);
                 }
+                if (!strncmp(s, "OK+NAME=KiteLink-v", 18)) { // it's a Kite-Link module, switch to Kite-Link control
+                    found = true;
+                    info.wireless.kitelink = true;
+                    strncpy(info.wireless.device_name, s + 8, sizeof(info.wireless.device_name)-1);
+                    SetupMetaData.Tx_WiFiProt_allowed_mask = 0; // wifi is owned by the Kite-Link network, kill the params
+                    SetupMetaData.Tx_WiFiChannel_allowed_mask = 0;
+                    SetupMetaData.Tx_WiFiPower_allowed_mask = 0;
+                }
                 cc = 128; // break also higher for loop, don't do 255 LOL
                 break;
             }
@@ -715,13 +822,15 @@ esp_read("dAT+BINDPHRASE=?", s, &len);)
             esp_configure_baudrate();
         }
 
-        esp_configure_wifiprotocol();
-        esp_configure_wifichannel();
-        esp_configure_wifipower();
-        if (version >= 10307) { // not available before v1.3.07
-            esp_configure_bindphrase();
-        } else {
-            // Houston, we have a problem. UDPCl is not available but we allow the user to select
+        if (!info.wireless.kitelink) { // Kite-Link owns protocol, channel, power, security itself
+            esp_configure_wifiprotocol();
+            esp_configure_wifichannel();
+            esp_configure_wifipower();
+            if (version >= 10307) { // not available before v1.3.07
+                esp_configure_bindphrase();
+            } else {
+                // Houston, we have a problem. UDPCl is not available but we allow the user to select
+            }
         }
 
         if (esp_read("AT+RESTART", s, &len)) { // will respond with 'KO' if a restart isn't needed

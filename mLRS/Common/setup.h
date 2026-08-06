@@ -220,6 +220,8 @@ void setup_configure_metadata(void)
 #else // ESP32
     SetupMetaData.Tx_WiFiProt_allowed_mask = 0b111111; // all protocols
 #endif
+    SetupMetaData.Tx_WiFiChannel_allowed_mask = UINT16_MAX; // all, may be zeroed when a Kite-Link module is detected
+    SetupMetaData.Tx_WiFiPower_allowed_mask = UINT16_MAX; // all, may be zeroed when a Kite-Link module is detected
 
     //-- Rx:
 

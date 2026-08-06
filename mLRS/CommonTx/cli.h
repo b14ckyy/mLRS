@@ -786,6 +786,11 @@ void tTxCli::print_help_do(void)
         case 21: putsn("  esp set pswd = str    -> set password (24 chars max)"); break;
         case 22: putsn("  esp get netssid       -> get network SSID (UDPSTA)"); break;
         case 23: putsn("  esp set netssid = str -> set network SSID (24 chars max)"); break;
+        case 24: putsn("  kite pair             -> Kite-Link: take part in pairing"); break;
+        case 25: putsn("  kite sethost          -> Kite-Link: promote module to network host"); break;
+        case 26: putsn("  kite factoryreset     -> Kite-Link: factory reset the module"); break;
+        case 27: putsn("  kite get gwname       -> Kite-Link: get gateway name"); break;
+        case 28: putsn("  kite set gwname = str -> Kite-Link: set gateway name (24 chars max)"); break;
   #endif
 #elif defined USE_HC04_MODULE // let's assume that not both ESP and HC04 can be true
         case 17: putsn("  hc04 pt               -> enter serial passthrough"); break;
@@ -976,6 +981,29 @@ bool rx_param_changed;
                 puts("  esp netssid: ");
                 putsn((svalue[0] != '\0') ? svalue : "empty value -> clears ssid");
                 tasks.SetCliTask(TX_TASK_CLI_ESP_SET_NETWORK_SSID, svalue);
+            }
+        } else
+        if (is_cmd("kite pair")) {
+            tasks.SetCliTask(TX_TASK_KITE_PAIR);
+        } else
+        if (is_cmd("kite sethost")) {
+            tasks.SetCliTask(TX_TASK_KITE_SETHOST);
+        } else
+        if (is_cmd("kite factoryreset sure")) {
+            tasks.SetCliTask(TX_TASK_KITE_FACTORYRESET);
+        } else
+        if (is_cmd("kite factoryreset")) {
+            putsn("  this wipes the Kite-Link module completely!");
+            putsn("  confirm with: kite factoryreset sure");
+        } else
+        if (is_cmd("kite get gwname")) {
+            tasks.SetCliTask(TX_TASK_CLI_KITE_GET_GWNAME);
+        } else
+        if (is_cmd_set_str("kite set gwname", svalue)) {
+            if (strlen(svalue) < 1 || strlen(svalue) > 24) {
+                putsn("err: invalid string (1 to 24 chars)");
+            } else {
+                tasks.SetCliTask(TX_TASK_CLI_KITE_SET_GWNAME, svalue);
             }
 #endif
 #endif

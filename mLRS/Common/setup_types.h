@@ -483,6 +483,8 @@ typedef struct
     uint16_t Tx_SerialBaudrate2_allowed_mask;
     uint16_t Tx_Buzzer_allowed_mask;
     uint16_t Tx_WiFiProt_allowed_mask;
+    uint16_t Tx_WiFiChannel_allowed_mask;
+    uint16_t Tx_WiFiPower_allowed_mask;
 
     char Rx_Power_optstr[67+1];
     uint16_t Rx_Diversity_allowed_mask;
